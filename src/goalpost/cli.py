@@ -26,7 +26,7 @@ index 1234567..abcdefg 100644
 """
 
 
-def _run_git(*args: str) -> tuple[int, str, str]:
+def _run_git(*args: str, cwd: str | None = None) -> tuple[int, str, str]:
     """Run a git command. Return (returncode, stdout, stderr)."""
     try:
         proc = subprocess.run(
@@ -34,6 +34,7 @@ def _run_git(*args: str) -> tuple[int, str, str]:
             capture_output=True,
             text=True,
             timeout=30,
+            cwd=cwd,
         )
         return proc.returncode, proc.stdout, proc.stderr
     except FileNotFoundError:
@@ -42,14 +43,14 @@ def _run_git(*args: str) -> tuple[int, str, str]:
         return 2, "", "git: command timed out"
 
 
-def _get_diff(base: str | None) -> tuple[int, str]:
+def _get_diff(base: str | None, cwd: str | None = None) -> tuple[int, str]:
     """Get the diff text from git. Return (exit_code, diff_text).
 
     exit_code is 0 on success, 2 on git error.
     """
     if base is not None:
         # Verify the ref exists
-        rc, _, stderr = _run_git("rev-parse", "--verify", base)
+        rc, _, stderr = _run_git("rev-parse", "--verify", base, cwd=cwd)
         if rc != 0:
             print(stderr.strip(), file=sys.stderr)
             return 2, ""
@@ -57,29 +58,33 @@ def _get_diff(base: str | None) -> tuple[int, str]:
     else:
         args = ["diff", "--no-color", "--unified=3", "HEAD"]
 
-    rc, stdout, stderr = _run_git(*args)
+    rc, stdout, stderr = _run_git(*args, cwd=cwd)
     if rc != 0:
         print(stderr.strip(), file=sys.stderr)
         return 2, ""
     return 0, stdout
 
 
-def _get_old_text(path: str, base: str | None) -> str | None:
+def _get_old_text(path: str, base: str | None, cwd: str | None = None) -> str | None:
     """Get the old version of a file from git."""
     if base is not None:
-        ref = base
+        rc, merge_base, _ = _run_git("merge-base", base, "HEAD", cwd=cwd)
+        if rc != 0:
+            return None
+        ref = merge_base.strip()
     else:
         ref = "HEAD"
-    rc, stdout, stderr = _run_git("show", f"{ref}:{path}")
+    rc, stdout, stderr = _run_git("show", f"{ref}:{path}", cwd=cwd)
     if rc != 0:
         return None
     return stdout
 
 
-def _get_new_text(path: str) -> str | None:
+def _get_new_text(path: str, cwd: str | None = None) -> str | None:
     """Read the current version of a file from the worktree."""
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        full_path = os.path.join(cwd, path) if cwd else path
+        with open(full_path, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
     except (OSError, IOError):
         return None
@@ -136,13 +141,16 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"unknown command: {args.command}")
 
     # Check we are in a git repo
-    rc, _, stderr = _run_git("rev-parse", "--is-inside-work-tree")
+    rc, repo_root, stderr = _run_git(
+        "rev-parse", "--show-toplevel"
+    )
     if rc != 0:
         print(stderr.strip(), file=sys.stderr)
         return 2
+    repo_root = repo_root.strip()
 
     # Get the diff
-    exit_code, diff_text = _get_diff(args.base)
+    exit_code, diff_text = _get_diff(args.base, cwd=repo_root)
     if exit_code != 0:
         return exit_code
 
@@ -172,8 +180,8 @@ def main(argv: list[str] | None = None) -> int:
         path = df.new_path or df.old_path
 
         if path and not df.is_deleted:
-            new_text = _get_new_text(path)
-            old_text = _get_old_text(path, args.base)
+            new_text = _get_new_text(path, cwd=repo_root)
+            old_text = _get_old_text(path, args.base, cwd=repo_root)
 
         findings = analyze_file(df, old_text, new_text)
         all_findings.extend(findings)

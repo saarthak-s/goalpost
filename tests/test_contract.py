@@ -195,6 +195,37 @@ def test_cli_exit_2_outside_repo(tmp_path):
     assert result.returncode == 2
 
 
+def test_cli_from_repo_subdirectory(tmp_path):
+    """The CLI resolves worktree paths when invoked below the repo root."""
+    repo = tmp_path / "repo"
+    nested = repo / "tools"
+    tests_dir = repo / "tests"
+    nested.mkdir(parents=True)
+    tests_dir.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"],
+                   cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    test_file = tests_dir / "test_latency.py"
+    test_file.write_text("def test_latency():\n    assert latency < 200\n")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "baseline"], cwd=repo, check=True)
+    test_file.write_text("def test_latency():\n    assert latency < 500\n")
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).parents[1] / "src")
+    result = subprocess.run(
+        [sys.executable, "-m", "goalpost.cli"],
+        capture_output=True,
+        text=True,
+        cwd=nested,
+        env=env,
+    )
+
+    assert result.returncode == 1
+    assert "bound-loosened" in result.stdout
+
+
 def test_demo_exits_1():
     """goalpost demo should exit 1 (it has a high finding)."""
     result = subprocess.run(

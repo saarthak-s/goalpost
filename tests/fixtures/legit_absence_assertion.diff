@@ -1,0 +1,8 @@
+diff --git a/tests/test_config.py b/tests/test_config.py
+index 1234567..abcdefg 100644
+--- a/tests/test_config.py
++++ b/tests/test_config.py
+@@ -1,2 +1,2 @@
+ def test_missing_config():
+-    assert load_config().id == config.id
++    assert load_config().id is None

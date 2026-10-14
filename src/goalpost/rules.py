@@ -68,7 +68,7 @@ _JS_WEAK = frozenset([
 
 # Suppressions
 _SUPPRESSION_PATTERNS = [
-    re.compile(r"#\s*noqa"),
+    re.compile(r"#\s*noqa(?!\s*:\s*E402\b)"),
     re.compile(r"#\s*type:\s*ignore"),
     re.compile(r"#\s*pragma:\s*no\s*cover"),
     re.compile(r"//\s*@ts-ignore"),
@@ -78,9 +78,9 @@ _SUPPRESSION_PATTERNS = [
 
 # Skip patterns
 _SKIP_PATTERNS_ADDED = [
-    re.compile(r"@pytest\.mark\.skip"),
+    re.compile(r"@pytest\.mark\.skip(?:\s*\(|\s*$)"),
     re.compile(r"@pytest\.mark\.xfail"),
-    re.compile(r"@unittest\.skip"),
+    re.compile(r"@unittest\.skip(?:\s*\(|\s*$)"),
     re.compile(r"pytest\.skip\("),
     re.compile(r"\.skip\s*\("),
     re.compile(r"\bxit\s*\("),
@@ -159,6 +159,26 @@ def _py_assert_is_weak(line: str) -> bool:
         for node in ast.walk(test)
     ):
         return False
+    return True
+
+
+def _py_assert_is_truthiness_downgrade(line: str) -> bool:
+    """Return whether a Python assert became an unqualified truthiness check."""
+    try:
+        parsed = ast.parse(line.strip())
+    except SyntaxError:
+        return False
+    if len(parsed.body) != 1 or not isinstance(parsed.body[0], ast.Assert):
+        return False
+    test = parsed.body[0].test
+    if isinstance(test, ast.Compare):
+        if any(isinstance(op, (ast.Is, ast.IsNot)) for op in test.ops):
+            return False
+        return not any(
+            isinstance(op, (ast.Eq, ast.NotEq, ast.Lt, ast.Gt, ast.LtE, ast.GtE,
+                             ast.In, ast.NotIn))
+            for op in test.ops
+        )
     return True
 
 
@@ -441,9 +461,11 @@ def _check_matcher_downgrade(df: DiffFile) -> list[Finding]:
             elif _is_py_file(path):
                 old_has_strong = bool(_PY_STRONG_LINE_RE.search(old_s))
                 new_has_strong = bool(_PY_STRONG_LINE_RE.search(new_s))
-                new_has_weak = bool(_PY_WEAK_LINE_RE.search(new_s))
+                new_has_weak = bool(_PY_WEAK_METHODS.intersection(
+                    re.findall(r"\b(assert\w+)\s*\(", new_s)
+                ))
                 if not new_has_weak:
-                    new_has_weak = _py_assert_is_weak(new_s)
+                    new_has_weak = _py_assert_is_truthiness_downgrade(new_s)
                 if old_has_strong and new_has_strong and _is_length_only_rewrite(
                     old_s, new_s
                 ):
@@ -656,6 +678,80 @@ def _reconstruct_file_text(df: DiffFile, *, old: bool) -> Optional[str]:
     return "\n".join(lines)
 
 
+def _python_test_details(source: str) -> list[tuple[str, int, str]]:
+    """Return test names, definition lines, and normalized source bodies."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    lines = source.replace("\r\n", "\n").splitlines()
+    details = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if not node.name.startswith("test_") or node.end_lineno is None:
+            continue
+        body = "\n".join(lines[node.lineno - 1:node.end_lineno])
+        body = re.sub(r"def\s+test_\w+", "def test_RENAMED", body)
+        body = re.sub(r"\b\d+(?:\.\d+)?\b", "NUMBER", body)
+        body = re.sub(r"(['\"]).*?\1", "STRING", body)
+        details.append((node.name, node.lineno, body))
+    return details
+
+
+def _javascript_test_details(source: str) -> list[tuple[str, int, str]]:
+    """Return JS test names, start lines, and normalized test blocks."""
+    lines = source.replace("\r\n", "\n").splitlines()
+    starts: list[tuple[str, int, int]] = []
+    for i, line in enumerate(lines):
+        match = _JS_TEST_START.match(line)
+        if not match:
+            continue
+        name_match = re.search(
+            r"(?:it|test)(?:\.only|\.skip)?\s*\(\s*['\"]([^'\"]*)['\"]",
+            line,
+        )
+        name = name_match.group(1) if name_match else f"__test_{i}"
+        indent = len(line) - len(line.lstrip())
+        starts.append((name, i, indent))
+
+    details = []
+    for index, (name, start, indent) in enumerate(starts):
+        end = len(lines)
+        for next_name, next_start, next_indent in starts[index + 1:]:
+            if next_indent <= indent:
+                end = next_start
+                break
+        body = "\n".join(lines[start:end])
+        body = re.sub(r"(['\"]).*?\1", "STRING", body)
+        body = re.sub(r"\b\d+(?:\.\d+)?\b", "NUMBER", body)
+        details.append((name, start + 1, body))
+    return details
+
+
+def _has_renamed_test(old_text: str, new_text: str, path: str,
+                      removed_name: str) -> bool:
+    """Return whether a missing test name was replaced by a similar test nearby."""
+    if _is_py_file(path):
+        old_details = _python_test_details(old_text)
+        new_details = _python_test_details(new_text)
+    elif _is_js_file(path):
+        old_details = _javascript_test_details(old_text)
+        new_details = _javascript_test_details(new_text)
+    else:
+        return False
+
+    old_match = next((item for item in old_details if item[0] == removed_name), None)
+    if old_match is None:
+        return False
+    for new_name, new_line, new_body in new_details:
+        if new_name == removed_name or abs(new_line - old_match[1]) > 3:
+            continue
+        if difflib.SequenceMatcher(None, old_match[2], new_body).ratio() >= 0.78:
+            return True
+    return False
+
+
 def _check_test_removed(df: DiffFile, old_text: Optional[str],
                         new_text: Optional[str]) -> list[Finding]:
     """Check for test functions/blocks that disappeared."""
@@ -683,6 +779,8 @@ def _check_test_removed(df: DiffFile, old_text: Optional[str],
         new_counts = _count_py_assertions(new_text)
         for name in old_counts:
             if name not in new_counts:
+                if _has_renamed_test(old_text, new_text, path, name):
+                    continue
                 findings.append(Finding(
                     rule="test-removed",
                     severity="high",
@@ -697,6 +795,8 @@ def _check_test_removed(df: DiffFile, old_text: Optional[str],
         new_counts = _count_js_assertions(new_text)
         for name in old_counts:
             if name not in new_counts:
+                if _has_renamed_test(old_text, new_text, path, name):
+                    continue
                 findings.append(Finding(
                     rule="test-removed",
                     severity="high",

@@ -1,0 +1,1 @@
+{"rule": "bound-loosened", "severity": "high", "file": "apps/Nexus-Project/tests/engine.properties.test.ts", "line": 5}

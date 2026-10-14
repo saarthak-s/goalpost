@@ -8,25 +8,25 @@ a test was skipped, or a new test asserts nothing but "not None."
 
 No model. No API key. Nothing leaves the machine.
 
-## The grep does not catch this
+## A real public diff
+
+This is a real, defensible change, not a staged gotcha: the commit message
+explains that the tighter threshold failed under the full concurrent suite.
+It is still a 10x wider bound that a reviewer should see:
 
 ```diff
-- assert latency < 200
-+ assert latency < 500
+- expect(median).toBeLessThan(50);
++ expect(median).toBeLessThan(500);
 ```
 
-An assertion-count script stays silent. One assert left, one assert arrived.
+From [The-No-Hands-company/Nexus-Systems commit
+e300b09](https://github.com/The-No-Hands-company/Nexus-Systems/commit/e300b09fdf781ce48993b39f94993525fa061e1c):
 
 ```text
-$ git diff -U0 | grep -c '^-.*assert'    # 1
-$ git diff -U0 | grep -c '^+.*assert'    # 1
-```
-
-```text
-$ goalpost
-high  bound-loosened  tests/test_latency.py:12
-  - assert latency < 200
-  + assert latency < 500
+$ goalpost --base HEAD~1
+high  bound-loosened  apps/Nexus-Project/tests/engine.properties.test.ts:261
+  - expect(median).toBeLessThan(50);
+  + expect(median).toBeLessThan(500);
   same comparison, wider bound. CI can still be green.
 
 1 high. Exit 1.
@@ -34,6 +34,9 @@ high  bound-loosened  tests/test_latency.py:12
 
 `toBe(200)` rewritten as `toBe(201)` is not a failure. The bar stayed as strict.
 That line is printed as info so you can glance at it.
+
+An assertion-count script stays silent: one assertion was removed and one
+arrived. The finding is a review signal, not an accusation.
 
 ## Install
 
