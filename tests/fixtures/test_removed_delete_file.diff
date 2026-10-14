@@ -1,0 +1,14 @@
+diff --git a/tests/test_cache.py b/tests/test_cache.py
+deleted file mode 100644
+index 1234567..0000000
+--- a/tests/test_cache.py
++++ /dev/null
+@@ -1,10 +0,0 @@
+-import pytest
+-
+-def test_cache_hit():
+-    cache.set('key', 'value')
+-    assert cache.get('key') == 'value'
+-
+-def test_cache_miss():
+-    assert cache.get('missing') is None

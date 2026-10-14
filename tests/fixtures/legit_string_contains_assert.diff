@@ -1,0 +1,8 @@
+diff --git a/tests/test_messages.py b/tests/test_messages.py
+index 1234567..abcdefg 100644
+--- a/tests/test_messages.py
++++ b/tests/test_messages.py
+@@ -3,7 +3,7 @@ def test_error_message():
+     result = get_error()
+-    assert result == "failed to assert connection"
++    assert result == "failed to assert database connection"

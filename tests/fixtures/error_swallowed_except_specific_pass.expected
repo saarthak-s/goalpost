@@ -1,0 +1,1 @@
+{"rule": "error-swallowed", "severity": "high", "file": "tests/test_io.py", "line": 9}

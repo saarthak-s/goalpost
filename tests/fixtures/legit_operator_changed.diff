@@ -1,0 +1,8 @@
+diff --git a/tests/test_limit.py b/tests/test_limit.py
+index 1234567..abcdefg 100644
+--- a/tests/test_limit.py
++++ b/tests/test_limit.py
+@@ -4,7 +4,7 @@ def test_limit():
+     count = get_count()
+-    assert count < 100
++    assert count <= 100

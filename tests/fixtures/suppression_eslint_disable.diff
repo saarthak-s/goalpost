@@ -1,0 +1,11 @@
+diff --git a/tests/format.spec.js b/tests/format.spec.js
+index 1234567..abcdefg 100644
+--- a/tests/format.spec.js
++++ b/tests/format.spec.js
+@@ -1,5 +1,6 @@
+ describe('format', () => {
+   it('formats date', () => {
++    // eslint-disable-next-line no-unused-vars
+     const result = formatDate(new Date());
+     expect(result).toMatch(/\d{4}-\d{2}-\d{2}/);
+   });

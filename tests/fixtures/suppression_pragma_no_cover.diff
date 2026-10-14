@@ -1,0 +1,8 @@
+diff --git a/tests/test_edge.py b/tests/test_edge.py
+index 1234567..abcdefg 100644
+--- a/tests/test_edge.py
++++ b/tests/test_edge.py
+@@ -3,5 +3,5 @@ def test_edge_case():
+     result = compute_edge()
+-    assert result >= 0
++    assert result >= 0  # pragma: no cover

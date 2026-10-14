@@ -1,0 +1,13 @@
+diff --git a/tests/api.test.js b/tests/api.test.js
+index 1234567..abcdefg 100644
+--- a/tests/api.test.js
++++ b/tests/api.test.js
+@@ -3,8 +3,11 @@ describe('api', () => {
+   it('handles errors', () => {
+-    const res = callApi();
+-    expect(res.error).toEqual('not found');
++    try {
++      const res = callApi();
++    } catch (e) {
++    }
+   });

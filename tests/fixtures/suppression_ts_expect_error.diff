@@ -1,0 +1,10 @@
+diff --git a/tests/types.test.ts b/tests/types.test.ts
+index 1234567..abcdefg 100644
+--- a/tests/types.test.ts
++++ b/tests/types.test.ts
+@@ -4,6 +4,7 @@ describe('types', () => {
+   it('casts correctly', () => {
++    // @ts-expect-error
+     const val: number = cast('42');
+     expect(val).toBe(42);
+   });

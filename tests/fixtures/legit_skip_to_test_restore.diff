@@ -1,0 +1,10 @@
+diff --git a/tests/restore.test.js b/tests/restore.test.js
+index 1234567..abcdefg 100644
+--- a/tests/restore.test.js
++++ b/tests/restore.test.js
+@@ -1,7 +1,7 @@ describe('restore', () => {
+-  test.skip('is fixed now', () => {
++  test('is fixed now', () => {
+     expect(compute()).toBe(42);
+   });
+ });

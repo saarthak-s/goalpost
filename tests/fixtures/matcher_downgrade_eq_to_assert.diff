@@ -1,0 +1,8 @@
+diff --git a/tests/test_convert.py b/tests/test_convert.py
+index 1234567..abcdefg 100644
+--- a/tests/test_convert.py
++++ b/tests/test_convert.py
+@@ -3,7 +3,7 @@ def test_convert():
+     result = convert('42')
+-    assert result == 42
++    assert result

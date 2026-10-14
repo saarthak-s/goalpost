@@ -1,0 +1,10 @@
+diff --git a/tests/calc.test.ts b/tests/calc.test.ts
+index 1234567..abcdefg 100644
+--- a/tests/calc.test.ts
++++ b/tests/calc.test.ts
+@@ -4,6 +4,7 @@ describe('calc', () => {
+   it('adds numbers', () => {
+     const result = add(1, 2);
++    // @ts-ignore
+     expect(result).toBe(3);
+   });

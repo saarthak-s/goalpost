@@ -1,0 +1,11 @@
+diff --git a/tests/test_retry.py b/tests/test_retry.py
+new file mode 100644
+index 0000000..abcdefg
+--- /dev/null
++++ b/tests/test_retry.py
+@@ -0,0 +1,7 @@
++from myapp import retry
++
++def test_retry_works():
++    result = retry(lambda: 42)
++    assert result is not None

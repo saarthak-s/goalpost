@@ -1,0 +1,12 @@
+diff --git a/tests/handler.test.js b/tests/handler.test.js
+new file mode 100644
+index 0000000..abcdefg
+--- /dev/null
++++ b/tests/handler.test.js
+@@ -0,0 +1,8 @@
++describe('handler', () => {
++  it('processes request', () => {
++    const result = handle({type: 'test'});
++    expect(result).toBeTruthy();
++  });
++});

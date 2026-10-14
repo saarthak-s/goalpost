@@ -1,0 +1,8 @@
+diff --git a/tests/test_types.py b/tests/test_types.py
+index 1234567..abcdefg 100644
+--- a/tests/test_types.py
++++ b/tests/test_types.py
+@@ -5,7 +5,7 @@ def test_type_conversion():
+     result = convert(value)
+-    assert isinstance(result, int)
++    assert isinstance(result, int)  # noqa

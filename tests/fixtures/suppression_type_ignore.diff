@@ -1,0 +1,8 @@
+diff --git a/tests/test_mymod.py b/tests/test_mymod.py
+index 1234567..abcdefg 100644
+--- a/tests/test_mymod.py
++++ b/tests/test_mymod.py
+@@ -3,6 +3,7 @@ def test_output():
+     val = compute()
+     assert val == expected
++    result = transform(val)  # type: ignore

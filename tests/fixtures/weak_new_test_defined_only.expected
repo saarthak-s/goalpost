@@ -1,0 +1,1 @@
+{"rule": "weak-new-test", "severity": "high", "file": "tests/service.test.ts", "line": null}

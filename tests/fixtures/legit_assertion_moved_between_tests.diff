@@ -1,0 +1,14 @@
+diff --git a/tests/test_balance.py b/tests/test_balance.py
+index 1234567..abcdefg 100644
+--- a/tests/test_balance.py
++++ b/tests/test_balance.py
+@@ -1,10 +1,10 @@
+ def test_deposit():
+     bal = deposit(100)
+     assert bal == 100
+-    assert bal > 0
+ 
+ def test_withdraw():
+     bal = withdraw(50)
+     assert bal == 50
++    assert bal >= 0

@@ -1,0 +1,10 @@
+diff --git a/tests/debug.test.js b/tests/debug.test.js
+index 1234567..abcdefg 100644
+--- a/tests/debug.test.js
++++ b/tests/debug.test.js
+@@ -1,7 +1,7 @@ describe('debug', () => {
+-  it('logs output', () => {
++  it.only('logs output', () => {
+     const output = debug();
+     expect(output).toBe('ok');
+   });

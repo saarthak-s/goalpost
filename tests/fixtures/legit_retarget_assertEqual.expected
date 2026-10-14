@@ -1,0 +1,1 @@
+{"rule": "retarget", "severity": "info", "file": "tests/test_config.py", "line": 8}

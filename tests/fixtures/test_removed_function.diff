@@ -1,0 +1,15 @@
+diff --git a/tests/test_utils.py b/tests/test_utils.py
+index 1234567..abcdefg 100644
+--- a/tests/test_utils.py
++++ b/tests/test_utils.py
+@@ -1,12 +1,7 @@
+ def test_parse_int():
+     assert parse_int('42') == 42
+ 
+-def test_parse_float():
+-    assert parse_float('3.14') == 3.14
+-    assert parse_float('0') == 0.0
+-    assert parse_float('-1.5') == -1.5
+-
+ def test_parse_bool():
+     assert parse_bool('true') is True

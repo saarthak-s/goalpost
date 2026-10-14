@@ -1,0 +1,15 @@
+diff --git a/tests/router.test.js b/tests/router.test.js
+index 1234567..abcdefg 100644
+--- a/tests/router.test.js
++++ b/tests/router.test.js
+@@ -1,12 +1,6 @@
+ describe('router', () => {
+   it('matches root', () => {
+     expect(match('/')).toBe('home');
+   });
+-
+-  it('matches user route', () => {
+-    expect(match('/user/1')).toBe('user');
+-    expect(match('/user/2')).toBe('user');
+-  });
+ });

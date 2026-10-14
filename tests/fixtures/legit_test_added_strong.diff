@@ -1,0 +1,14 @@
+diff --git a/tests/test_new_feature.py b/tests/test_new_feature.py
+new file mode 100644
+index 0000000..abcdefg
+--- /dev/null
++++ b/tests/test_new_feature.py
+@@ -0,0 +1,8 @@
++import pytest
++
++def test_feature_works():
++    result = feature()
++    assert result == 42
++
++def test_feature_edge():
++    assert feature(-1) == 0

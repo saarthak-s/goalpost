@@ -1,0 +1,12 @@
+diff --git a/tests/service.test.ts b/tests/service.test.ts
+new file mode 100644
+index 0000000..abcdefg
+--- /dev/null
++++ b/tests/service.test.ts
+@@ -0,0 +1,8 @@
++describe('service', () => {
++  it('creates instance', () => {
++    const svc = createService();
++    expect(svc).toBeDefined();
++  });
++});

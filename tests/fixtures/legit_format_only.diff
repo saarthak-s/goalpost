@@ -1,0 +1,12 @@
+diff --git a/tests/test_format.py b/tests/test_format.py
+index 1234567..abcdefg 100644
+--- a/tests/test_format.py
++++ b/tests/test_format.py
+@@ -3,8 +3,10 @@ def test_format_string():
+-    result = format_string(  'hello',   'world'  )
+-    assert result == 'hello world'
++    result = format_string(
++        'hello',
++        'world',
++    )
++    assert result == 'hello world'

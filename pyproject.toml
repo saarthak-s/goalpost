@@ -1,0 +1,27 @@
+[project]
+name = "goalpost"
+version = "0.1.0"
+description = "See where a diff made the tests easier to pass. Local, no API key."
+readme = "README.md"
+authors = [
+    { name = "Saarthak", email = "saarthak.srivastav6@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+license = "MIT"
+
+[project.scripts]
+goalpost = "goalpost.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/goalpost"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = ["pytest"]

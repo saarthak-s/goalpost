@@ -1,0 +1,1 @@
+{"rule": "skip-added", "severity": "high", "file": "tests/test_auth.py", "line": 6}

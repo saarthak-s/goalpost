@@ -1,0 +1,8 @@
+diff --git a/src/handler.py b/src/handler.py
+index 1234567..abcdefg 100644
+--- a/src/handler.py
++++ b/src/handler.py
+@@ -10,7 +10,7 @@ def handle(request):
+-    result = process(request)
++    result = process(request)  # noqa: E501
+     return result

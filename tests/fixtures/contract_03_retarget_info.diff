@@ -1,0 +1,10 @@
+diff --git a/tests/api.test.ts b/tests/api.test.ts
+index 1234567..abcdefg 100644
+--- a/tests/api.test.ts
++++ b/tests/api.test.ts
+@@ -10,7 +10,7 @@ describe('api', () => {
+   it('returns correct status', () => {
+     const res = fetch('/health');
+-    expect(res.status).toBe(200);
++    expect(res.status).toBe(201);
+   });

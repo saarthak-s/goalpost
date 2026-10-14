@@ -1,0 +1,10 @@
+diff --git a/tests/test_logging.py b/tests/test_logging.py
+index 1234567..abcdefg 100644
+--- a/tests/test_logging.py
++++ b/tests/test_logging.py
+@@ -1,5 +1,5 @@
+-# Test the logging system
++# Test the logging system - updated for v2
+ def test_log_level():
+     logger = setup()
+     assert logger.level == 'INFO'

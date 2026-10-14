@@ -1,0 +1,1 @@
+{"rule": "suppression-added", "severity": "high", "file": "tests/test_mymod.py", "line": 5}

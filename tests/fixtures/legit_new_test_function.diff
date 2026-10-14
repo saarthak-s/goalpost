@@ -1,0 +1,11 @@
+diff --git a/tests/test_expand.py b/tests/test_expand.py
+index 1234567..abcdefg 100644
+--- a/tests/test_expand.py
++++ b/tests/test_expand.py
+@@ -3,3 +3,7 @@ def test_expand():
+     result = expand('a*')
+     assert result == ['a1', 'a2']
++
++def test_expand_empty():
++    result = expand('')
++    assert result == []

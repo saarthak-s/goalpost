@@ -1,0 +1,9 @@
+diff --git a/tests/test_latency.py b/tests/test_latency.py
+index 1234567..abcdefg 100644
+--- a/tests/test_latency.py
++++ b/tests/test_latency.py
+@@ -10,4 +10,4 @@ def test_response_time():
+     start = time.time()
+     latency = measure()
+-    assert latency < 200
++    assert latency < 500

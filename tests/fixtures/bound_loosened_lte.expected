@@ -1,0 +1,1 @@
+{"rule": "bound-loosened", "severity": "high", "file": "tests/test_memory.py", "line": 6}

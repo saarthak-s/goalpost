@@ -1,0 +1,1 @@
+{"rule": "matcher-downgrade", "severity": "high", "file": "tests/user.test.js", "line": 8}

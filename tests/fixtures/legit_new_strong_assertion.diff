@@ -1,0 +1,8 @@
+diff --git a/tests/test_strong.py b/tests/test_strong.py
+index 1234567..abcdefg 100644
+--- a/tests/test_strong.py
++++ b/tests/test_strong.py
+@@ -3,3 +3,4 @@ def test_output():
+     result = process()
+     assert result == expected
++    assert result.timestamp > 0
