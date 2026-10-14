@@ -1,0 +1,1 @@
+{"rule": "matcher-downgrade", "severity": "high", "file": "tests/test_items.py", "line": 2}

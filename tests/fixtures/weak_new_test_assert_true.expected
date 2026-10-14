@@ -1,0 +1,1 @@
+{"rule": "weak-new-test", "severity": "high", "file": "tests/test_retry.py", "line": 5}

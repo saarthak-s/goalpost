@@ -1,0 +1,11 @@
+diff --git a/tests/test_retry.py b/tests/test_retry.py
+index 1234567..abcdefg 100644
+--- a/tests/test_retry.py
++++ b/tests/test_retry.py
+@@ -1,3 +1,7 @@
+ def test_existing():
+     assert result == 42
+ 
++def test_retry():
++    retry()
++    assert True

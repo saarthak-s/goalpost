@@ -1,5 +1,7 @@
 # Fixture precision
 
+This is an internal fixture-gate measurement, not a real-world accuracy claim.
+
 - Expected high findings: 30
 - Emitted high findings: 32
 - Precision: 94%

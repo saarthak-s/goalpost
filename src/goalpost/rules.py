@@ -79,6 +79,7 @@ _SUPPRESSION_PATTERNS = [
 # Skip patterns
 _SKIP_PATTERNS_ADDED = [
     re.compile(r"@pytest\.mark\.skip"),
+    re.compile(r"@pytest\.mark\.xfail"),
     re.compile(r"@unittest\.skip"),
     re.compile(r"pytest\.skip\("),
     re.compile(r"\.skip\s*\("),
@@ -96,6 +97,12 @@ _FOCUS_PATTERNS = [
 # Bound detection
 _BOUND_RE = re.compile(
     r"(.*?)\s*(<=?|>=?)\s*(\d+(?:\.\d+)?)\s*$"
+)
+
+_JS_BOUND_RE = re.compile(
+    r"^(.*?)\.\s*(toBeLessThan|toBeLessThanOrEqual|"
+    r"toBeGreaterThan|toBeGreaterThanOrEqual)\s*\(\s*"
+    r"(\d+(?:\.\d+)?)\s*\)\s*;?\s*$"
 )
 
 # JS test block start
@@ -326,6 +333,37 @@ def _check_bound_loosened(df: DiffFile) -> list[Finding]:
         for (old_lineno, old_text), (new_lineno, new_text) in pairs:
             old_m = _BOUND_RE.search(old_text.strip())
             new_m = _BOUND_RE.search(new_text.strip())
+            if _is_js_file(path):
+                old_m_js = _JS_BOUND_RE.search(old_text.strip())
+                new_m_js = _JS_BOUND_RE.search(new_text.strip())
+                if not old_m_js or not new_m_js:
+                    continue
+                old_lhs = re.sub(r"\s+", " ", old_m_js.group(1)).strip()
+                new_lhs = re.sub(r"\s+", " ", new_m_js.group(1)).strip()
+                old_op = old_m_js.group(2)
+                new_op = new_m_js.group(2)
+                old_val = float(old_m_js.group(3))
+                new_val = float(new_m_js.group(3))
+                if old_lhs != new_lhs or old_op != new_op:
+                    continue
+                permissive = (
+                    old_op in ("toBeLessThan", "toBeLessThanOrEqual")
+                    and new_val > old_val
+                ) or (
+                    old_op in ("toBeGreaterThan", "toBeGreaterThanOrEqual")
+                    and new_val < old_val
+                )
+                if permissive:
+                    findings.append(Finding(
+                        rule="bound-loosened",
+                        severity="high",
+                        file=path,
+                        line=new_lineno,
+                        old=old_text.strip(),
+                        new=new_text.strip(),
+                        message="same comparison, wider bound. CI can still be green.",
+                    ))
+                continue
             if not old_m or not new_m:
                 continue
 
@@ -406,6 +444,19 @@ def _check_matcher_downgrade(df: DiffFile) -> list[Finding]:
                 new_has_weak = bool(_PY_WEAK_LINE_RE.search(new_s))
                 if not new_has_weak:
                     new_has_weak = _py_assert_is_weak(new_s)
+                if old_has_strong and new_has_strong and _is_length_only_rewrite(
+                    old_s, new_s
+                ):
+                    findings.append(Finding(
+                        rule="matcher-downgrade",
+                        severity="high",
+                        file=path,
+                        line=new_lineno,
+                        old=old_s,
+                        new=new_s,
+                        message="collection equality replaced with a length-only check",
+                    ))
+                    continue
                 if old_has_strong and not new_has_strong and new_has_weak:
                     findings.append(Finding(
                         rule="matcher-downgrade",
@@ -417,6 +468,37 @@ def _check_matcher_downgrade(df: DiffFile) -> list[Finding]:
                         message="strong matcher replaced with weak check",
                     ))
     return findings
+
+
+def _is_length_only_rewrite(old_text: str, new_text: str) -> bool:
+    """Return whether collection equality became a length-only comparison."""
+    try:
+        old_tree = ast.parse(old_text.strip())
+        new_tree = ast.parse(new_text.strip())
+    except SyntaxError:
+        return False
+    if len(old_tree.body) != 1 or len(new_tree.body) != 1:
+        return False
+    old_stmt = old_tree.body[0]
+    new_stmt = new_tree.body[0]
+    if not isinstance(old_stmt, ast.Assert) or not isinstance(new_stmt, ast.Assert):
+        return False
+    if not isinstance(old_stmt.test, ast.Compare) or not isinstance(new_stmt.test, ast.Compare):
+        return False
+    if len(old_stmt.test.ops) != 1 or len(new_stmt.test.ops) != 1:
+        return False
+    if not isinstance(old_stmt.test.ops[0], ast.Eq) or not isinstance(new_stmt.test.ops[0], ast.Eq):
+        return False
+    old_left = old_stmt.test.left
+    new_left = new_stmt.test.left
+    return (
+        not (isinstance(old_left, ast.Call)
+             and isinstance(old_left.func, ast.Name)
+             and old_left.func.id == "len")
+        and isinstance(new_left, ast.Call)
+        and isinstance(new_left.func, ast.Name)
+        and new_left.func.id == "len"
+    )
 
 
 def _check_retarget(df: DiffFile) -> list[Finding]:
@@ -648,8 +730,8 @@ def _check_assertion_removed(df: DiffFile, old_text: Optional[str],
                         severity="high",
                         file=path,
                         line=new_linenos.get(name),
-                        old=f"{old_counts[name]} assertions",
-                        new=f"{new_counts[name]} assertions",
+                        old=_assertion_count_text(old_counts[name]),
+                        new=_assertion_count_text(new_counts[name]),
                         message=f"test '{name}' lost an assertion",
                     ))
     elif _is_js_file(path):
@@ -663,11 +745,17 @@ def _check_assertion_removed(df: DiffFile, old_text: Optional[str],
                         severity="high",
                         file=path,
                         line=None,
-                        old=f"{old_counts[name]} assertions",
-                        new=f"{new_counts[name]} assertions",
+                        old=_assertion_count_text(old_counts[name]),
+                        new=_assertion_count_text(new_counts[name]),
                         message=f"test '{name}' lost an assertion",
                     ))
     return findings
+
+
+def _assertion_count_text(count: int) -> str:
+    """Format an assertion count with correct singular/plural grammar."""
+    noun = "assertion" if count == 1 else "assertions"
+    return f"{count} {noun}"
 
 
 def _check_weak_new_test(df: DiffFile, new_text: Optional[str]) -> list[Finding]:
@@ -675,7 +763,14 @@ def _check_weak_new_test(df: DiffFile, new_text: Optional[str]) -> list[Finding]
     findings: list[Finding] = []
     path = df.new_path or ""
 
-    if not df.is_new:
+    added_test_names = {
+        match.group(1)
+        for hunk in df.hunks
+        for _, text in hunk.added
+        for match in [re.match(r"\s*(?:async\s+)?def\s+(test_\w+)\s*\(", text)]
+        if match
+    }
+    if not df.is_new and not added_test_names:
         return findings
 
     if new_text is None:
@@ -693,7 +788,9 @@ def _check_weak_new_test(df: DiffFile, new_text: Optional[str]) -> list[Finding]
 
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name.startswith("test_"):
+                if node.name.startswith("test_") and (
+                    df.is_new or node.name in added_test_names
+                ):
                     has_strong = False
                     has_any_assertion = False
                     for child in ast.walk(node):

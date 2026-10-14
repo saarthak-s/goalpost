@@ -41,8 +41,6 @@ Requires Git and Python 3.11+.
 
 ```bash
 uvx goalpost
-# or
-uvx goalpost
 ```
 
 Or, from a checkout:
@@ -102,6 +100,9 @@ tamperproof blocks edits during a Claude session. This reads the diff afterwards
 i-dont-believe-you counts assertions and looks for skips. It misses a same-count rewrite and a permissive bound. Those two are the point of this tool.
 RepoPilot is a broad deterministic reviewer. This does one job and fits on one screen.
 receipts re-runs the suite with the fix reverted. Use it when you need proof. This is the instant pass.
+
+The examples above are labeled fixture-gate measurements, not real-world
+accuracy claims.
 
 ## Star
 
