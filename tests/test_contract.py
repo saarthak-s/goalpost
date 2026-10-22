@@ -133,6 +133,75 @@ index 1234567..abcdefg 100644
         found = any(f.rule == exp["rule"] for f in high)
         assert found, f"Expected {exp}, got {[(f.rule, f.file, f.line) for f in high]}"
 
+    def test_skipif_is_not_a_skipped_test_but_xfail_is(self):
+        diff_text = """\
+diff --git a/tests/test_media.py b/tests/test_media.py
+index 1234567..abcdefg 100644
+--- a/tests/test_media.py
++++ b/tests/test_media.py
+@@ -1,3 +1,4 @@
++@pytest.mark.skipif(sys.platform == "win32", reason="needs ffmpeg")
+ def test_transcode():
+     assert transcode() == "ok"
+"""
+        findings = analyze_file(filter_test_files(parse_diff(diff_text))[0])
+        assert not any(f.rule == "skip-added" for f in findings)
+
+        diff_text = diff_text.replace(
+            "@pytest.mark.skipif(sys.platform == \"win32\", reason=\"needs ffmpeg\")",
+            "@pytest.mark.xfail(reason=\"known issue\")",
+        )
+        findings = analyze_file(filter_test_files(parse_diff(diff_text))[0])
+        assert any(
+            f.rule == "skip-added"
+            and f.message == "test marked expected-to-fail"
+            for f in findings
+        )
+
+    def test_is_none_remains_an_absence_assertion(self):
+        diff_text = """\
+diff --git a/tests/test_config.py b/tests/test_config.py
+index 1234567..abcdefg 100644
+--- a/tests/test_config.py
++++ b/tests/test_config.py
+@@ -1,2 +1,2 @@
+ def test_missing_config():
+-    assert load_config().id == config.id
++    assert load_config().id is None
+"""
+        findings = analyze_file(filter_test_files(parse_diff(diff_text))[0])
+        assert not any(f.rule == "matcher-downgrade" for f in findings)
+
+    def test_high_finding_suppresses_same_line_retarget_info(self):
+        diff_text = """\
+diff --git a/tests/test_latency.py b/tests/test_latency.py
+index 1234567..abcdefg 100644
+--- a/tests/test_latency.py
++++ b/tests/test_latency.py
+@@ -1,2 +1,2 @@
+ def test_latency():
+-    assert latency < 200
++    assert latency < 500
+"""
+        findings = analyze_file(filter_test_files(parse_diff(diff_text))[0])
+        assert [finding.rule for finding in findings] == ["bound-loosened"]
+
+        diff_text = """\
+diff --git a/tests/test_items.py b/tests/test_items.py
+index 1234567..abcdefg 100644
+--- a/tests/test_items.py
++++ b/tests/test_items.py
+@@ -1,2 +1,2 @@
+ def test_items():
+-    assert items == expected
++    assert len(items) == len(expected)
+"""
+        findings = analyze_file(filter_test_files(parse_diff(diff_text))[0])
+        assert [finding.rule for finding in findings] == ["matcher-downgrade"]
+
+    def test_swallowed_catch_is_not_double_counted_as_assertion_removed(self):
+        findings, _ = _run_fixture("error_swallowed_catch_js")
+        assert [finding.rule for finding in findings] == ["error-swallowed"]
 
 # ============================================================================
 # All fixtures: parametrized

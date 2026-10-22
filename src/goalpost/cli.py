@@ -7,8 +7,9 @@ import os
 import subprocess
 import sys
 
-from goalpost.gitdiff import parse_diff, filter_test_files
-from goalpost.rules import analyze_file
+from goalpost.gitdiff import DiffFile, filter_test_files, is_test_file, parse_diff
+from goalpost.rules import Finding, analyze_file
+from goalpost.hook import HOOK_COMMAND, install_hook, run_hook, settings_path
 from goalpost.report import render_text, render_json
 
 
@@ -106,6 +107,76 @@ def _run_demo(use_json: bool) -> int:
         return render_text(all_findings, sys.stdout)
 
 
+def _collect_findings(
+    base: str | None, *, include_untracked: bool = False
+) -> tuple[int, list[Finding]]:
+    """Scan the repo in the current directory. Return (exit_code, findings).
+
+    exit_code is 0 on success (findings may be empty) and 2 on git error.
+    """
+    rc, repo_root, stderr = _run_git("rev-parse", "--show-toplevel")
+    if rc != 0:
+        print(stderr.strip(), file=sys.stderr)
+        return 2, []
+    repo_root = repo_root.strip()
+
+    exit_code, diff_text = _get_diff(base, cwd=repo_root)
+    if exit_code != 0:
+        return exit_code, []
+
+    test_files = filter_test_files(parse_diff(diff_text)) if diff_text.strip() else []
+    all_findings = []
+    for df in test_files:
+        old_text = None
+        new_text = None
+        path = df.new_path or df.old_path
+        if path and not df.is_deleted:
+            new_text = _get_new_text(path, cwd=repo_root)
+            old_text = _get_old_text(path, base, cwd=repo_root)
+        all_findings.extend(analyze_file(df, old_text, new_text))
+
+    if include_untracked:
+        rc, output, stderr = _run_git(
+            "ls-files", "--others", "--exclude-standard", cwd=repo_root
+        )
+        if rc != 0:
+            print(stderr.strip(), file=sys.stderr)
+            return 2, []
+        for path in output.splitlines():
+            path = path.strip()
+            if not path or not is_test_file(path):
+                continue
+            new_text = _get_new_text(path, cwd=repo_root)
+            if new_text is None:
+                continue
+            untracked = DiffFile(
+                old_path=None,
+                new_path=path,
+                is_new=True,
+            )
+            all_findings.extend(analyze_file(untracked, new_text=new_text))
+
+    all_findings.sort(key=lambda f: (
+        f.file,
+        f.line if f.line is not None else 0,
+        f.rule,
+    ))
+    return 0, all_findings
+
+
+def _install_hook_cmd(args) -> int:
+    command = args.hook_command or (HOOK_COMMAND + (" --block" if args.block else ""))
+    try:
+        status = install_hook(settings_path(args.user), command)
+    except ValueError as exc:
+        print(f"goalpost: {exc}", file=sys.stderr)
+        return 2
+    print(f"goalpost Stop hook {status}")
+    print(f"  command: {command}")
+    print("  Restart Claude Code (or run /hooks) to load it.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -125,10 +196,27 @@ def main(argv: list[str] | None = None) -> int:
         help="Output findings as JSON",
     )
     parser.add_argument(
+        "--block",
+        action="store_true",
+        help="hook/install-hook: ask Claude to revert or justify high findings",
+    )
+    parser.add_argument(
+        "--user",
+        action="store_true",
+        help="install-hook: write ~/.claude/settings.json instead of the project file",
+    )
+    parser.add_argument(
+        "--hook-command",
+        metavar="CMD",
+        dest="hook_command",
+        default=None,
+        help="install-hook: command to register (default: 'goalpost hook')",
+    )
+    parser.add_argument(
         "command",
         nargs="?",
         default=None,
-        help="Subcommand (demo)",
+        help="Subcommand (demo, hook, install-hook)",
     )
 
     args = parser.parse_args(argv)
@@ -137,62 +225,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "demo":
         exit_code = _run_demo(args.use_json)
         return exit_code
+    elif args.command == "hook":
+        out = run_hook(
+            sys.stdin.read(),
+            lambda: _collect_findings(None, include_untracked=True),
+            block=args.block,
+        )
+        if out:
+            sys.stdout.write(out + "\n")
+        return 0
+    elif args.command == "install-hook":
+        return _install_hook_cmd(args)
     elif args.command is not None:
         parser.error(f"unknown command: {args.command}")
 
-    # Check we are in a git repo
-    rc, repo_root, stderr = _run_git(
-        "rev-parse", "--show-toplevel"
-    )
-    if rc != 0:
-        print(stderr.strip(), file=sys.stderr)
-        return 2
-    repo_root = repo_root.strip()
-
-    # Get the diff
-    exit_code, diff_text = _get_diff(args.base, cwd=repo_root)
+    exit_code, all_findings = _collect_findings(args.base, include_untracked=True)
     if exit_code != 0:
         return exit_code
-
-    if not diff_text.strip():
-        if args.use_json:
-            render_json([], sys.stdout)
-        else:
-            sys.stdout.write("0 high. Exit 0.\n")
-        return 0
-
-    # Parse and filter
-    files = parse_diff(diff_text)
-    test_files = filter_test_files(files)
-
-    if not test_files:
-        if args.use_json:
-            render_json([], sys.stdout)
-        else:
-            sys.stdout.write("0 high. Exit 0.\n")
-        return 0
-
-    # Analyze each test file
-    all_findings = []
-    for df in test_files:
-        old_text = None
-        new_text = None
-        path = df.new_path or df.old_path
-
-        if path and not df.is_deleted:
-            new_text = _get_new_text(path, cwd=repo_root)
-            old_text = _get_old_text(path, args.base, cwd=repo_root)
-
-        findings = analyze_file(df, old_text, new_text)
-        all_findings.extend(findings)
-
-    # Sort all findings by file, line, rule
-    all_findings.sort(key=lambda f: (
-        f.file,
-        f.line if f.line is not None else 0,
-        f.rule,
-    ))
-
     # Render
     if args.use_json:
         exit_code = render_json(all_findings, sys.stdout)

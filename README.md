@@ -58,6 +58,20 @@ No repository handy:
 uvx goalpost demo
 ```
 
+Install the optional Claude Code Stop hook in the current repository:
+
+```bash
+goalpost install-hook
+```
+
+To ask Claude to address high findings before the turn can stop:
+
+```bash
+goalpost install-hook --block
+```
+
+Restart Claude Code after installing the hook.
+
 ## Use it
 
 End of an agent session, before you commit:

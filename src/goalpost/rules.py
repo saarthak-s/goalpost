@@ -79,12 +79,13 @@ _SUPPRESSION_PATTERNS = [
 # Skip patterns
 _SKIP_PATTERNS_ADDED = [
     re.compile(r"@pytest\.mark\.skip(?:\s*\(|\s*$)"),
-    re.compile(r"@pytest\.mark\.xfail"),
     re.compile(r"@unittest\.skip(?:\s*\(|\s*$)"),
     re.compile(r"pytest\.skip\("),
     re.compile(r"\.skip\s*\("),
     re.compile(r"\bxit\s*\("),
     re.compile(r"\bxdescribe\s*\("),
+    re.compile(r"@pytest\.mark\.xfail\b"),
+    re.compile(r"\bpytest\.xfail\s*\("),
 ]
 
 # Focus patterns (info only)
@@ -107,7 +108,7 @@ _JS_BOUND_RE = re.compile(
 
 # JS test block start
 _JS_TEST_START = re.compile(
-    r"^\s*(?:it|test)(?:\.only|\.skip)?\s*\("
+    r"^\s*(?:it|xit|test)(?:\.only|\.skip)?\s*\("
 )
 
 # JS assertion line
@@ -204,7 +205,11 @@ def _check_skip_added(df: DiffFile) -> list[Finding]:
                             line=lineno,
                             old=None,
                             new=text.strip(),
-                            message="test skipped",
+                            message=(
+                                "test marked expected-to-fail"
+                                if "xfail" in text
+                                else "test skipped"
+                            ),
                         ))
                     break  # Don't double-report same line
     return findings
@@ -708,7 +713,7 @@ def _javascript_test_details(source: str) -> list[tuple[str, int, str]]:
         if not match:
             continue
         name_match = re.search(
-            r"(?:it|test)(?:\.only|\.skip)?\s*\(\s*['\"]([^'\"]*)['\"]",
+            r"(?:it|xit|test)(?:\.only|\.skip)?\s*\(\s*['\"]([^'\"]*)['\"]",
             line,
         )
         name = name_match.group(1) if name_match else f"__test_{i}"
@@ -745,9 +750,9 @@ def _has_renamed_test(old_text: str, new_text: str, path: str,
     if old_match is None:
         return False
     for new_name, new_line, new_body in new_details:
-        if new_name == removed_name or abs(new_line - old_match[1]) > 3:
+        if new_name == removed_name:
             continue
-        if difflib.SequenceMatcher(None, old_match[2], new_body).ratio() >= 0.78:
+        if difflib.SequenceMatcher(None, old_match[2], new_body).ratio() >= 0.9:
             return True
     return False
 
@@ -958,7 +963,7 @@ def _check_weak_new_test(df: DiffFile, new_text: Optional[str]) -> list[Finding]
                         has_strong = True
                         break
                 if not has_strong:
-                    name_m = re.search(r"(?:it|test)(?:\.only|\.skip)?\s*\(\s*['\"]([^'\"]*)['\"]", line)
+                    name_m = re.search(r"(?:it|xit|test)(?:\.only|\.skip)?\s*\(\s*['\"]([^'\"]*)['\"]", line)
                     name = name_m.group(1) if name_m else f"test at line {i+1}"
                     findings.append(Finding(
                         rule="weak-new-test",
@@ -986,7 +991,8 @@ def analyze_file(df: DiffFile, old_text: Optional[str] = None,
     findings.extend(_check_skip_added(df))
     findings.extend(_check_focus_added(df))
     findings.extend(_check_suppression_added(df))
-    findings.extend(_check_error_swallowed(df))
+    swallowed_findings = _check_error_swallowed(df)
+    findings.extend(swallowed_findings)
     findings.extend(_check_bound_loosened(df))
     findings.extend(_check_matcher_downgrade(df))
     findings.extend(_check_retarget(df))
@@ -998,13 +1004,28 @@ def analyze_file(df: DiffFile, old_text: Optional[str] = None,
 
     # File-level rules
     findings.extend(_check_test_removed(df, old_text, new_text))
-    findings.extend(_check_assertion_removed(df, old_text, new_text))
+    if not (swallowed_findings and _is_js_file(df.new_path or df.old_path or "")):
+        findings.extend(_check_assertion_removed(df, old_text, new_text))
 
     # For new files, try to get new_text from hunks if not provided
     effective_new = new_text
     if df.is_new and effective_new is None and df.hunks:
         effective_new = "\n".join(text for hunk in df.hunks for _, text in hunk.added)
     findings.extend(_check_weak_new_test(df, effective_new))
+
+    high_lines = {
+        (finding.file, finding.line)
+        for finding in findings
+        if finding.severity == "high"
+    }
+    findings = [
+        finding
+        for finding in findings
+        if not (
+            finding.rule == "retarget"
+            and (finding.file, finding.line) in high_lines
+        )
+    ]
 
     # Sort by file, line, rule
     findings.sort(key=lambda f: (
